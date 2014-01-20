@@ -18,7 +18,6 @@ $PluginInfo['RefreshCounts'] = array(
     'Description' => 'Adds a button to the category management dashboard that will refresh the discussion counts for all the categories. Helpful in restoring order after a spam attack.',
     'Version' => '1.1',
     'RequiredApplications' => array('Vanilla' => '2.0.18.10'),
-    'SettingsUrl' => '/vanilla/settings/managecategories',
     'MobileFriendly' => TRUE,
     'HasLocale' => TRUE,
     'Author' => 'Zachary Doll',
@@ -30,7 +29,8 @@ $PluginInfo['RefreshCounts'] = array(
 class RefreshCounts extends Gdn_Plugin {
 
   public function SettingsController_Render_Before($Sender) {
-    if($Sender->RequestMethod == 'managecategories') {
+    $RequestMethod = $Sender->RequestMethod;
+    if($RequestMethod == 'managecategories' || $RequestMethod == 'tagging') {
       $Sender->AddJsFile($this->GetResource('js/refreshcounts.js', FALSE, FALSE));
 
       //check for any stashed messages from the pre
@@ -44,12 +44,22 @@ class RefreshCounts extends Gdn_Plugin {
 
   public function SettingsController_AfterRenderAsset_Handler($Sender) {
     $EventArguments = $Sender->EventArguments;
-    if($Sender->RequestMethod == 'managecategories' && $EventArguments['AssetName'] == 'Content') {
-      echo Wrap(
-              Wrap(T('RefreshCounts.Heading'), 'h3') .
-              Wrap(
-                      T('RefreshCounts.Description') . ' ' .
-                      Anchor(T('Refresh Counts'), '/categories/refreshcounts', array('class' => 'SmallButton', 'id' => 'RefreshCountsButton', 'title' => T('RefreshCounts.Tooltip'))), 'div', array('class' => 'Info')), 'div', array('id' => 'RefreshCounts'));
+    $Method = $Sender->RequestMethod;
+    if($EventArguments['AssetName'] == 'Content') {
+      if($Method == 'managecategories') {
+        echo Wrap(
+                Wrap(T('RefreshCounts.CatHeading'), 'h3') .
+                Wrap(
+                        T('RefreshCounts.CatDescription') . ' ' .
+                        Anchor(T('Refresh Counts'), '/categories/refreshcounts', array('class' => 'SmallButton', 'id' => 'RefreshCountsButton', 'title' => T('RefreshCounts.CatTooltip'))), 'div', array('class' => 'Info')), 'div', array('id' => 'RefreshCounts'));
+      }
+      else if($Method == 'tagging') {
+        echo Wrap(
+                Wrap(T('RefreshCounts.TagHeading'), 'h3') .
+                Wrap(
+                        T('RefreshCounts.TagDescription') . ' ' .
+                        Anchor(T('Refresh Counts'), '/settings/refreshtagcounts', array('class' => 'SmallButton', 'id' => 'RefreshCountsButton', 'title' => T('RefreshCounts.TagTooltip'))), 'div', array('class' => 'Info')), 'div', array('id' => 'RefreshCounts'));
+      }
     }
   }
 
@@ -69,6 +79,36 @@ class RefreshCounts extends Gdn_Plugin {
     // stash the inform message for later
     Gdn::Session()->Stash('RefreshCountsMessage', T('RefreshCounts.Complete'));
     Redirect('/vanilla/settings/managecategories');
+  }
+  
+  public function SettingsController_RefreshTagCounts_Create($Sender) {
+    $Sender->Permission('Garden.Settings.Manage');
+
+    $Px = $Sender->Database->DatabasePrefix;
+
+    $SqlDriver = Gdn::SQL();
+    // Delete all the orphaned tagdiscussion records
+    $Sql = 'delete td.* ' .
+            "from {$Px}TagDiscussion as td " .
+            "left join {$Px}Discussion as d ON td.DiscussionID = d.DiscussionID " .
+            'where d.DiscussionID is null';
+
+    $SqlDriver->Reset();
+    $SqlDriver->Query($Sql);
+    
+    // refresh the countdiscussions on all tags
+    $Sql = "update {$Px}Tag as t " .
+            'set CountDiscussions = ( ' .
+            'select count(td.TagID) ' .
+            "from {$Px}TagDiscussion as td " .
+            'where td.TagID = t.TagID group by t.TagID)';
+    
+    $SqlDriver->Reset();
+    $SqlDriver->Query($Sql);
+    
+    // stash the inform message for later
+    Gdn::Session()->Stash('RefreshCountsMessage', T('RefreshCounts.TagComplete'));
+    Redirect('/settings/tagging');
   }
 
 }
