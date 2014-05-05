@@ -16,7 +16,7 @@
 $PluginInfo['RefreshCounts'] = array(
     'Name' => 'Refresh Counts',
     'Description' => 'Adds a button to the category management dashboard that will refresh the discussion counts for all the categories. Helpful in restoring order after a spam attack.',
-    'Version' => '1.1',
+    'Version' => '1.2',
     'RequiredApplications' => array('Vanilla' => '2.0.18.10'),
     'MobileFriendly' => TRUE,
     'HasLocale' => TRUE,
@@ -77,7 +77,7 @@ class RefreshCounts extends Gdn_Plugin {
     }
 
     // stash the inform message for later
-    Gdn::Session()->Stash('RefreshCountsMessage', T('RefreshCounts.Complete'));
+    Gdn::Session()->Stash('RefreshCountsMessage', T('RefreshCounts.CatComplete'));
     Redirect('/vanilla/settings/managecategories');
   }
   
